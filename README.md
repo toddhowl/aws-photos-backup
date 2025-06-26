@@ -42,13 +42,13 @@ This utility scans your macOS Photos library for new photos and videos, organize
 Edit `config.yaml` in the project root:
 
 ```yaml
-s3_bucket: howell-mac-photos-backup
-photos_library_path: /Users/todd/Pictures/Photos Library.photoslibrary/originals
+s3_bucket: your-s3-bucket-name
+photos_library_path: /path/to/your/Photos\ Library.photoslibrary/originals
 zip_file_name: photos_backup.zip  # (not used in grouped mode, but required)
 last_upload_file: last_upload.txt
 s3_key_format: "{year}/{zip}"
 log_level: "info"
-region: us-east-1
+region: your-aws-region
 test_mode_limit: 10  # Number of files to process in test mode
 storage_class: STANDARD  # Options: STANDARD, GLACIER, DEEP_ARCHIVE, etc.
 allowed_extensions:
@@ -66,6 +66,7 @@ allowed_extensions:
   - .hevc
   - .3gp
   - .3g2
+max_concurrent_uploads: 4  # Maximum number of concurrent zip/upload operations
 ```
 - `s3_bucket`: Your S3 bucket name
 - `photos_library_path`: Path to your Photos library originals
@@ -75,6 +76,7 @@ allowed_extensions:
 - `test_mode_limit`: Number of files to process in test mode (for test script)
 - `storage_class`: S3 storage class for uploaded zips. Use `STANDARD` for regular S3, `GLACIER` or `DEEP_ARCHIVE` for archival storage.
 - `allowed_extensions`: List of file extensions to include in backup. You can add or remove types as needed.
+- `max_concurrent_uploads`: Maximum number of concurrent zip/upload operations. Adjust based on your system resources and network capacity.
 
 ## Usage
 ### Install dependencies
@@ -111,7 +113,7 @@ You can automate the utility to run weekly using `cron` or macOS `launchd`.
    ```
 2. Add a line to run the backup every Sunday at 2am:
    ```sh
-   0 2 * * 0 cd /Users/todd/Documents/Git/aws-photos-backup && /usr/local/go/bin/go run ./cmd/photos_backup.go
+   0 2 * * 0 cd /path/to/your/aws-photos-backup && /usr/local/go/bin/go run ./cmd/photos_backup.go
    ```
    - Adjust the path to `go` if needed (`which go` to find it).
 

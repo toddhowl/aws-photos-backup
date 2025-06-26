@@ -1,0 +1,11 @@
+# Ignore personal and sensitive files
+# config.yaml
+last_upload.txt
+photo_metadata.json
+*.zip
+# Ignore OS and editor files
+.DS_Store
+*.swp
+*.swo
+.idea/
+.vscode/
