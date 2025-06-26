@@ -1,0 +1,28 @@
+# Configuration for AWS Photos Backup Utility
+# Set your S3 bucket name and other variables here
+
+s3_bucket: howell-mac-photos-backup
+photos_library_path: /Users/todd/Pictures/Photos Library.photoslibrary/originals
+zip_file_name: photos_backup.zip
+last_upload_file: last_upload.txt
+s3_key_format: "{year}/{zip}"
+log_level: "info"
+region: us-east-1
+test_mode_limit: 25
+storage_class: GLACIER  # Options: STANDARD, GLACIER, DEEP_ARCHIVE, etc.
+allowed_extensions:
+  - .jpg
+  - .jpeg
+  - .png
+  - .heic
+  - .tiff
+  - .crw
+  - .dng
+  - .mov
+  - .mp4
+  - .avi
+  - .m4v
+  - .hevc
+  - .3gp
+  - .3g2
+max_concurrent_uploads: 8  # Maximum number of concurrent zip/upload operations
