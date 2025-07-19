@@ -1,5 +1,5 @@
 # Ignore personal and sensitive files
-# config.yaml
+config.yaml
 last_upload.txt
 photo_metadata.json
 *.zip
@@ -9,3 +9,23 @@ photo_metadata.json
 *.swo
 .idea/
 .vscode/
+# .github/ should not be ignored if you want workflows or copilot-instructions tracked
+# Ignore personal and sensitive files
+<<<<<<< HEAD
+# config.yaml
+=======
+config.yaml
+>>>>>>> todd
+last_upload.txt
+photo_metadata.json
+*.zip
+# Ignore OS and editor files
+.DS_Store
+*.swp
+*.swo
+.idea/
+.vscode/
+<<<<<<< HEAD
+=======
+.github/
+>>>>>>> todd
