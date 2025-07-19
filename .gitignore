@@ -11,21 +11,8 @@ photo_metadata.json
 .vscode/
 # .github/ should not be ignored if you want workflows or copilot-instructions tracked
 # Ignore personal and sensitive files
-<<<<<<< HEAD
-# config.yaml
-=======
-config.yaml
->>>>>>> todd
-last_upload.txt
-photo_metadata.json
-*.zip
-# Ignore OS and editor files
-.DS_Store
-*.swp
-*.swo
-.idea/
-.vscode/
-<<<<<<< HEAD
-=======
 .github/
->>>>>>> todd
+upload_state.json
+upload_state_test.json
+*.log
+

@@ -64,6 +64,11 @@ This Go utility scans your macOS Photos library for new photos and videos, organ
 
 ---
 
+
+> **Security Note:**
+> **Never put AWS credentials (access key, secret key, etc.) in `config.yaml`.**
+> Use environment variables or your `~/.aws/credentials` file for authentication. See [AWS documentation](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html) for details.
+
 ## Configuration
 
 Copy `config.sample.yaml` to `config.yaml` in the project root, then edit as needed. Example:
