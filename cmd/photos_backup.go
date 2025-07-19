@@ -102,8 +102,19 @@ func main() {
 	// Set up a semaphore to limit concurrency
 	sem := make(chan struct{}, cfg.MaxConcurrentUploads)
 
+	// Load upload state for resume support
+	statePath := "upload_state.json"
+	uploadState, _ := photosbackup.LoadUploadState(statePath)
+	if uploadState == nil {
+		uploadState = &photosbackup.UploadState{CompletedMonths: make(map[string]string)}
+	}
+
 	// For each year/month group, zip and upload concurrently (but limited by semaphore)
 	for ym, files := range photosByYearMonth {
+		// Skip months already uploaded (resume support)
+		if _, done := uploadState.CompletedMonths[ym]; done {
+			continue
+		}
 		wg.Add(1)
 		go func(ym string, files []string) {
 			defer wg.Done()
@@ -120,32 +131,63 @@ func main() {
 				mu.Lock()
 				failedZips++
 				mu.Unlock()
-			} else {
-				fmt.Printf("[DONE] Zipped %s\n", zipName)
-				year := strings.Split(ym, "-")[0]
-				s3Key := photosbackup.S3Key(cfg, year, zipName)
-				// Update progress bar for each file
-				for i, file := range files {
-					progressMu.Lock()
-					fileProgress++
-					updateBar(label + fmt.Sprintf(" file %d/%d: %s", i+1, len(files), file))
-					progressMu.Unlock()
+				return
+			}
+			fmt.Printf("[DONE] Zipped %s\n", zipName)
+			year := strings.Split(ym, "-")[0]
+			s3Key := photosbackup.S3Key(cfg, year, zipName)
+			// Update progress bar for each file
+			for i, file := range files {
+				progressMu.Lock()
+				fileProgress++
+				updateBar(label + fmt.Sprintf(" file %d/%d: %s", i+1, len(files), file))
+				progressMu.Unlock()
+			}
+			fmt.Printf("[START] Uploading %s to S3 as %s\n", zipName, s3Key)
+			// Retry logic for S3 upload
+			var uploadErr error
+			for attempt := 1; attempt <= 3; attempt++ {
+				uploadErr = photosbackup.UploadToS3(ctx, cfg.S3Bucket, s3Key, zipName, cfg.Region, cfg.StorageClass)
+				if uploadErr == nil {
+					break
 				}
-				fmt.Printf("[START] Uploading %s to S3 as %s\n", zipName, s3Key)
-				// Upload the zip file to S3
-				if err := photosbackup.UploadToS3(ctx, cfg.S3Bucket, s3Key, zipName, cfg.Region, cfg.StorageClass); err != nil {
-					log.Printf("[ERROR] Failed to upload %s: %v", zipName, err)
-					mu.Lock()
-					failedUploads++
-					mu.Unlock()
+				log.Printf("[WARN] Upload attempt %d for %s failed: %v", attempt, zipName, uploadErr)
+				time.Sleep(time.Second * time.Duration(attempt))
+			}
+			if uploadErr != nil {
+				log.Printf("[ERROR] Failed to upload %s after 3 attempts: %v", zipName, uploadErr)
+				mu.Lock()
+				failedUploads++
+				mu.Unlock()
+				return
+			}
+			// Checksum verification after upload, skip if storage class is GLACIER or DEEP_ARCHIVE
+			storageClass := strings.ToUpper(cfg.StorageClass)
+			if storageClass == "GLACIER" || storageClass == "DEEP_ARCHIVE" {
+				log.Printf("[INFO] Skipping checksum verification for %s due to storage class %s", zipName, storageClass)
+			} else {
+				localSum, err := photosbackup.FileSHA256(zipName)
+				if err != nil {
+					log.Printf("[ERROR] Could not compute checksum for %s: %v", zipName, err)
 				} else {
-					fmt.Printf("[DONE] Uploaded %s to S3\n", zipName)
-					progressMu.Lock()
-					updateBar(label + " uploaded!")
-					progressMu.Unlock()
-					os.Remove(zipName) // Remove local zip after upload
+					remoteSum, err := photosbackup.S3SHA256(ctx, cfg, s3Key)
+					if err != nil {
+						log.Printf("[ERROR] Could not verify checksum for %s: %v", zipName, err)
+					} else if localSum != remoteSum {
+						log.Printf("[ERROR] Checksum mismatch for %s: local %s, remote %s", zipName, localSum, remoteSum)
+					} else {
+						fmt.Printf("[OK] Checksum verified for %s\n", zipName)
+					}
 				}
 			}
+			// Mark this month as completed in upload state
+			uploadState.CompletedMonths[ym] = zipName
+			photosbackup.SaveUploadState(statePath, uploadState)
+			fmt.Printf("[DONE] Uploaded %s to S3\n", zipName)
+			progressMu.Lock()
+			updateBar(label + " uploaded!")
+			progressMu.Unlock()
+			os.Remove(zipName) // Remove local zip after upload
 		}(ym, files)
 	}
 	wg.Wait()

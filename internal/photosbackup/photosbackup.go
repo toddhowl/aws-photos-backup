@@ -3,6 +3,7 @@ package photosbackup
 import (
 	"archive/zip"
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"io"
 	"log"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/rwcarlsen/goexif/exif"
@@ -229,4 +231,38 @@ func S3Key(cfg *Config, year, zipName string) string {
 		format = "{year}/{zip}"
 	}
 	return strings.ReplaceAll(strings.ReplaceAll(format, "{year}", year), "{zip}", zipName)
+}
+
+// FileSHA256 computes the SHA256 checksum of a local file.
+func FileSHA256(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%x", h.Sum(nil)), nil
+}
+
+// S3SHA256 downloads the S3 object and computes its SHA256 checksum.
+func S3SHA256(ctx context.Context, cfg *Config, key string) (string, error) {
+	awsCfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(cfg.Region))
+	if err != nil {
+		return "", err
+	}
+	client := s3.NewFromConfig(awsCfg)
+	buf := manager.NewWriteAtBuffer([]byte{})
+	_, err = manager.NewDownloader(client).Download(ctx, buf, &s3.GetObjectInput{
+		Bucket: &cfg.S3Bucket,
+		Key:    &key,
+	})
+	if err != nil {
+		return "", err
+	}
+	h := sha256.New()
+	h.Write(buf.Bytes())
+	return fmt.Sprintf("%x", h.Sum(nil)), nil
 }
